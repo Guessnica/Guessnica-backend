@@ -1,3 +1,4 @@
+using Guessnica_backend.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Guessnica_backend.Controllers;

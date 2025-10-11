@@ -1,4 +1,4 @@
-namespace Guessnica_backend;
+namespace Guessnica_backend.Models;
 
 public class WeatherForecast
 {
