@@ -61,6 +61,11 @@ builder.Services.AddAuthentication(options =>
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
 })
+.AddFacebook(options =>
+{
+    options.AppId = builder.Configuration["Authentication:Facebook:AppId"]!;
+    options.AppSecret = builder.Configuration["Authentication:Facebook:AppSecret"]!;
+})
 .AddJwtBearer(options =>
 {
     options.RequireHttpsMetadata = false;
@@ -193,12 +198,14 @@ builder.Services.AddCors(options =>
 
 builder.Services
     .AddOptions<EmailOptions>()
-    .Bind(builder.Configuration.GetSection("Email"))
+    .Bind(builder.Configuration.GetSection("EmailOptions"))
     .ValidateDataAnnotations()
     .Validate(opt => opt.User == opt.FromEmail, "For Gmail, User must equal FromEmail")
     .ValidateOnStart();
 
 builder.Services.AddScoped<IAppEmailSender, MailKitEmailSender>();
+
+builder.Services.AddScoped<IJwtService, JwtService>();
 
 var app = builder.Build();
 
