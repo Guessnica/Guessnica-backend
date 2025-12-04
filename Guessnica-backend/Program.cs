@@ -207,6 +207,8 @@ builder.Services.AddScoped<IAppEmailSender, MailKitEmailSender>();
 
 builder.Services.AddScoped<IJwtService, JwtService>();
 
+builder.Services.AddScoped<ILocationService, LocationService>();
+
 var app = builder.Build();
 
 app.UseExceptionHandler("/error");
@@ -240,7 +242,8 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     var userManager = services.GetRequiredService<UserManager<AppUser>>();
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-    
+
+    // Ensure roles exist
     foreach (var r in new[] { "User", "Admin" })
     {
         if (!await roleManager.RoleExistsAsync(r))
@@ -249,25 +252,44 @@ using (var scope = app.Services.CreateScope())
         }
     }
     
-    var seedEmail = "test@example.com";
-    var user = await userManager.FindByEmailAsync(seedEmail);
+    var userEmail = "test@example.com";
+    var user = await userManager.FindByEmailAsync(userEmail);
     if (user == null)
     {
         user = new AppUser
         {
-            UserName = seedEmail,
-            Email = seedEmail,
+            UserName = userEmail,
+            Email = userEmail,
             DisplayName = "Test User",
             EmailConfirmed = true
         };
-        var create = await userManager.CreateAsync(user, "Haslo123!");
-        if (!create.Succeeded)
-            throw new Exception(string.Join("; ", create.Errors.Select(e => $"{e.Code}: {e.Description}")));
+        var createUser = await userManager.CreateAsync(user, "Haslo123!");
+        if (!createUser.Succeeded)
+            throw new Exception(string.Join("; ", createUser.Errors.Select(e => $"{e.Code}: {e.Description}")));
     }
-
     if (!await userManager.IsInRoleAsync(user, "User"))
     {
         await userManager.AddToRoleAsync(user, "User");
+    }
+    
+    var adminEmail = "admin@example.com";
+    var admin = await userManager.FindByEmailAsync(adminEmail);
+    if (admin == null)
+    {
+        admin = new AppUser
+        {
+            UserName = adminEmail,
+            Email = adminEmail,
+            DisplayName = "Admin User",
+            EmailConfirmed = true
+        };
+        var createAdmin = await userManager.CreateAsync(admin, "Admin123!");
+        if (!createAdmin.Succeeded)
+            throw new Exception(string.Join("; ", createAdmin.Errors.Select(e => $"{e.Code}: {e.Description}")));
+    }
+    if (!await userManager.IsInRoleAsync(admin, "Admin"))
+    {
+        await userManager.AddToRoleAsync(admin, "Admin");
     }
 }
 
