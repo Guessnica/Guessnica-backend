@@ -1,14 +1,21 @@
-namespace Guessnica_backend.Services;
-
-using Models;
+using Guessnica_backend.Models;
+using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-public interface ILocationService
+namespace Guessnica_backend.Services
 {
-    Task<IEnumerable<Location>> GetAllAsync();
-    Task<Location> GetByIdAsync(int id);
-    Task<Location> CreateAsync(Location loc);
-    Task<Location> UpdateAsync(int id, Location updated);
-    Task<bool> DeleteAsync(int id);
+    public interface ILocationService
+    {
+        Task<IEnumerable<Location>> GetAllAsync();
+        Task<Location> GetByIdAsync(int id);
+        
+        Task<Location> CreateAsync(Location loc, IFormFile image);
+        
+        Task<Location> UpdateAsync(int id, Location updated, IFormFile? image = null);
+
+        Task<bool> DeleteAsync(int id);
+        
+        Task<int> CleanupUnusedImagesAsync();
+    }
 }

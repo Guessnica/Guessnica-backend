@@ -31,4 +31,9 @@
       </Content>
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Migrations\" />
+      <Folder Include="wwwroot\images\locations\" />
+    </ItemGroup>
+
 </Project>

@@ -9,18 +9,8 @@ services:
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
-  guessnica-backend-dev:
-    build:
-      context: .
-      dockerfile: Guessnica-backend/Dockerfile-dev
-    container_name: guessnica-backend-dev
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8080
-    #ports:
-     # - "8080:8080"
-    depends_on:
-      - db
+    volumes:
+      - images:/app/wwwroot/images/locations
   db:
     image: postgres:16
     container_name: guessnica-db
@@ -35,3 +25,4 @@ services:
 
 volumes:
   pgdata:
+  images:

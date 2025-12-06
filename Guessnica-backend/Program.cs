@@ -219,6 +219,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseStaticFiles();
+
 app.UseCors(app.Environment.IsDevelopment() ? "DevCors" : "ProdCors");
 
 app.UseAuthentication();
@@ -242,8 +244,7 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     var userManager = services.GetRequiredService<UserManager<AppUser>>();
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-
-    // Ensure roles exist
+    
     foreach (var r in new[] { "User", "Admin" })
     {
         if (!await roleManager.RoleExistsAsync(r))
