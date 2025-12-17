@@ -211,6 +211,8 @@ builder.Services.AddScoped<ILocationService, LocationService>();
 
 builder.Services.AddScoped<IRiddleService, RiddleService>();
 
+builder.Services.AddScoped<IGameService, GameService>();
+
 var app = builder.Build();
 
 app.UseExceptionHandler("/error");
