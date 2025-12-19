@@ -215,6 +215,8 @@ builder.Services.AddScoped<IGameService, GameService>();
 
 builder.Services.AddScoped<IAdminService, AdminService>();
 
+builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
+
 var app = builder.Build();
 
 app.UseExceptionHandler("/error");
