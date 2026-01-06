@@ -23,11 +23,8 @@ jobs:
     - name: Build solution
       run: dotnet build --no-restore --configuration Release
     
-    - name: Run Unit Tests with Coverage
-      run: dotnet test Guessnica-backend.UnitTests/Guessnica-backend.UnitTests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=unit-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./coverage/unit
-    
-    - name: Run Integration Tests with Coverage
-      run: dotnet test Guessnica-backend.Integration.Test/Guessnica-backend.Integration.Test.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=integration-tests.trx" --collect:"XPlat Code Coverage" --results-directory ./coverage/integration
+    - name: Run All Tests with Coverage
+      run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage" --results-directory ./coverage
     
     - name: Generate Coverage Report
       uses: danielpalme/ReportGenerator-GitHub-Action@5.3.11
