@@ -217,6 +217,8 @@ builder.Services.AddScoped<IAdminService, AdminService>();
 
 builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
 
+builder.Services.AddScoped<IUserStatsService, UserStatsService>();
+
 var app = builder.Build();
 
 app.UseExceptionHandler("/error");

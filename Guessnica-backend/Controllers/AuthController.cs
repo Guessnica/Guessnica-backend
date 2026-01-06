@@ -57,29 +57,6 @@ public class AuthController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet("me")]
-    public async Task<IActionResult> Me()
-    {
-        Console.WriteLine("aaa");
-        Console.WriteLine(User.FindFirstValue(JwtRegisteredClaimNames.Sub));
-        var userId = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
-                     ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null) return Unauthorized();
-
-        var user = await _userManager.FindByIdAsync(userId);
-        if (user == null) return NotFound();
-
-        var roles = await _userManager.GetRolesAsync(user);
-        return Ok(new MeResponseDto
-        {
-            Id = user.Id,
-            DisplayName = user.DisplayName,
-            Email = user.Email,
-            Roles = roles.ToArray()
-        });
-    }
-
-    [Authorize]
     [HttpPost("logout")]
     public IActionResult Logout() => Ok(new { message = "Logged out (discard JWT client-side)." });
     
