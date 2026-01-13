@@ -3,6 +3,8 @@ using Moq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Authentication;
 using Guessnica_backend.Controllers;
 using Guessnica_backend.Models;
 using Guessnica_backend.Services;
@@ -20,14 +22,41 @@ public class ConfirmEmailTests
     public ConfirmEmailTests()
     {
         var userStoreMock = new Mock<IUserStore<AppUser>>();
+        var optionsMock = new Mock<IOptions<IdentityOptions>>();
+        var passwordHasherMock = new Mock<IPasswordHasher<AppUser>>();
+        var userValidators = new List<IUserValidator<AppUser>>();
+        var passwordValidators = new List<IPasswordValidator<AppUser>>();
+        var keyNormalizerMock = new Mock<ILookupNormalizer>();
+        var errorsMock = new Mock<IdentityErrorDescriber>();
+        var servicesMock = new Mock<IServiceProvider>();
+        var loggerUserManagerMock = new Mock<ILogger<UserManager<AppUser>>>();
+
         _userManagerMock = new Mock<UserManager<AppUser>>(
-            userStoreMock.Object, null, null, null, null, null, null, null, null);
+            userStoreMock.Object,
+            optionsMock.Object,
+            passwordHasherMock.Object,
+            userValidators,
+            passwordValidators,
+            keyNormalizerMock.Object,
+            errorsMock.Object,
+            servicesMock.Object,
+            loggerUserManagerMock.Object);
 
         var contextAccessorMock = new Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
         var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<AppUser>>();
+        var optionsSignInMock = new Mock<IOptions<IdentityOptions>>();
+        var loggerSignInMock = new Mock<ILogger<SignInManager<AppUser>>>();
+        var schemesMock = new Mock<IAuthenticationSchemeProvider>();
+        var confirmationMock = new Mock<IUserConfirmation<AppUser>>();
+
         _signInManagerMock = new Mock<SignInManager<AppUser>>(
-            _userManagerMock.Object, contextAccessorMock.Object,
-            claimsFactoryMock.Object, null, null, null, null);
+            _userManagerMock.Object,
+            contextAccessorMock.Object,
+            claimsFactoryMock.Object,
+            optionsSignInMock.Object,
+            loggerSignInMock.Object,
+            schemesMock.Object,
+            confirmationMock.Object);
 
         _jwtServiceMock = new Mock<IJwtService>();
         _loggerMock = new Mock<ILogger<AuthController>>();
@@ -61,7 +90,9 @@ public class ConfirmEmailTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
         var value = okResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Equal("Email confirmed successfully!", message);
 
@@ -69,25 +100,27 @@ public class ConfirmEmailTests
             x => x.Log(
                 LogLevel.Information,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Email confirmed successfully")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Email confirmed successfully")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
 
     [Fact]
     public async Task ConfirmEmail_WithNullUserId_ReturnsBadRequest()
     {
-        string userId = null;
+        string? userId = null;
         var token = "valid-token";
 
-        var result = await _controller.ConfirmEmail(userId, token);
+        var result = await _controller.ConfirmEmail(userId!, token);
 
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(400, badRequestResult.StatusCode);
 
         var value = badRequestResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Equal("Invalid confirmation link.", message);
 
@@ -106,7 +139,9 @@ public class ConfirmEmailTests
         Assert.Equal(400, badRequestResult.StatusCode);
 
         var value = badRequestResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Equal("Invalid confirmation link.", message);
 
@@ -117,15 +152,17 @@ public class ConfirmEmailTests
     public async Task ConfirmEmail_WithNullToken_ReturnsBadRequest()
     {
         var userId = "user-id-123";
-        string token = null;
+        string? token = null;
 
-        var result = await _controller.ConfirmEmail(userId, token);
+        var result = await _controller.ConfirmEmail(userId, token!);
 
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(400, badRequestResult.StatusCode);
 
         var value = badRequestResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Equal("Invalid confirmation link.", message);
 
@@ -144,7 +181,9 @@ public class ConfirmEmailTests
         Assert.Equal(400, badRequestResult.StatusCode);
 
         var value = badRequestResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Equal("Invalid confirmation link.", message);
 
@@ -158,7 +197,7 @@ public class ConfirmEmailTests
         var token = "valid-token";
 
         _userManagerMock.Setup(x => x.FindByIdAsync(userId))
-            .ReturnsAsync((AppUser)null);
+            .ReturnsAsync((AppUser?)null);
 
         var result = await _controller.ConfirmEmail(userId, token);
 
@@ -166,7 +205,9 @@ public class ConfirmEmailTests
         Assert.Equal(400, badRequestResult.StatusCode);
 
         var value = badRequestResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Equal("Invalid confirmation link.", message);
 
@@ -176,9 +217,9 @@ public class ConfirmEmailTests
             x => x.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("user not found")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("user not found")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
 
@@ -209,7 +250,9 @@ public class ConfirmEmailTests
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(400, badRequestResult.StatusCode);
         var value = badRequestResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Equal("Invalid confirmation link.", message);
     }
@@ -243,7 +286,6 @@ public class ConfirmEmailTests
             EmailConfirmed = true
         };
 
-
         _userManagerMock.Setup(x => x.FindByIdAsync(userId))
             .ReturnsAsync(user);
         _userManagerMock.Setup(x => x.ConfirmEmailAsync(user, token))
@@ -254,7 +296,9 @@ public class ConfirmEmailTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(200, okResult.StatusCode);
         var value = okResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Equal("Email confirmed successfully!", message);
         _userManagerMock.Verify(x => x.ConfirmEmailAsync(user, token), Times.Once);
@@ -275,7 +319,9 @@ public class ConfirmEmailTests
         Assert.Equal(500, objectResult.StatusCode);
 
         var value = objectResult.Value;
+        Assert.NotNull(value);
         var messageProperty = value.GetType().GetProperty("message");
+        Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value) as string;
         Assert.Contains("error occurred during email confirmation", message, StringComparison.OrdinalIgnoreCase);
 
@@ -283,9 +329,9 @@ public class ConfirmEmailTests
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Unexpected error")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Unexpected error")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
 }

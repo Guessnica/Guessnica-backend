@@ -3,12 +3,11 @@ using Moq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
-using Guessnica_backend.Controllers;
 using Guessnica_backend.Models;
 using Guessnica_backend.Services;
 using Guessnica_backend.Dtos;
 
-namespace Guessnica_backend.Tests.Controllers;
+namespace Guessnica_backend.Tests.Controllers.AuthControllerTests;
 
 public class FacebookLoginTests
 {
@@ -19,28 +18,54 @@ public class FacebookLoginTests
     private readonly Mock<IFacebookAuthService> _facebookAuthServiceMock;
     private readonly AuthController _controller;
 
-    public FacebookLoginTests()
-    {
-        var userStoreMock = new Mock<IUserStore<AppUser>>();
-        _userManagerMock = new Mock<UserManager<AppUser>>(
-            userStoreMock.Object, null, null, null, null, null, null, null, null);
+ public FacebookLoginTests()
+{
+    var userStoreMock = new Mock<IUserStore<AppUser>>();
+    var passwordHasherMock = new Mock<IPasswordHasher<AppUser>>();
+    var userValidatorsMock = new List<IUserValidator<AppUser>> { new Mock<IUserValidator<AppUser>>().Object };
+    var passwordValidatorsMock = new List<IPasswordValidator<AppUser>> { new Mock<IPasswordValidator<AppUser>>().Object };
+    var keyNormalizerMock = new Mock<ILookupNormalizer>();
+    var errorsMock = new Mock<IdentityErrorDescriber>();
+    var servicesMock = new Mock<IServiceProvider>();
+    var userLoggerMock = new Mock<ILogger<UserManager<AppUser>>>();
 
-        var contextAccessorMock = new Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
-        var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<AppUser>>();
-        _signInManagerMock = new Mock<SignInManager<AppUser>>(
-            _userManagerMock.Object, contextAccessorMock.Object,
-            claimsFactoryMock.Object, null, null, null, null);
+    _userManagerMock = new Mock<UserManager<AppUser>>(
+        userStoreMock.Object, 
+        null, // options
+        passwordHasherMock.Object,
+        userValidatorsMock,
+        passwordValidatorsMock,
+        keyNormalizerMock.Object,
+        errorsMock.Object,
+        servicesMock.Object,
+        userLoggerMock.Object);
 
-        _jwtServiceMock = new Mock<IJwtService>();
-        _loggerMock = new Mock<ILogger<AuthController>>();
-        _facebookAuthServiceMock = new Mock<IFacebookAuthService>();
+    var contextAccessorMock = new Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+    var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<AppUser>>();
+    var optionsAccessorMock = new Mock<Microsoft.Extensions.Options.IOptions<IdentityOptions>>();
+    var signInLoggerMock = new Mock<ILogger<SignInManager<AppUser>>>();
+    var schemesMock = new Mock<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>();
+    var confirmationMock = new Mock<IUserConfirmation<AppUser>>();
 
-        _controller = new AuthController(
-            _userManagerMock.Object,
-            _signInManagerMock.Object,
-            _jwtServiceMock.Object,
-            _loggerMock.Object);
-    }
+    _signInManagerMock = new Mock<SignInManager<AppUser>>(
+        _userManagerMock.Object, 
+        contextAccessorMock.Object,
+        claimsFactoryMock.Object, 
+        optionsAccessorMock.Object,
+        signInLoggerMock.Object,
+        schemesMock.Object,
+        confirmationMock.Object);
+
+    _jwtServiceMock = new Mock<IJwtService>();
+    _loggerMock = new Mock<ILogger<AuthController>>();
+    _facebookAuthServiceMock = new Mock<IFacebookAuthService>();
+
+    _controller = new AuthController(
+        _userManagerMock.Object,
+        _signInManagerMock.Object,
+        _jwtServiceMock.Object,
+        _loggerMock.Object);
+}
 
     [Fact]
     public async Task FacebookLogin_WithValidToken_ReturnsOkWithJwtToken()
