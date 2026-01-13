@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Authentication;
 using Guessnica_backend.Controllers;
 using Guessnica_backend.Models;
 using Guessnica_backend.Services;
@@ -24,14 +26,29 @@ namespace Guessnica_backend.Tests.Controllers
         public RegisterTests()
         {
             var userStoreMock = new Mock<IUserStore<AppUser>>();
+            
             _userManagerMock = new Mock<UserManager<AppUser>>(
-                userStoreMock.Object, null, null, null, null, null, null, null, null);
+                userStoreMock.Object,
+                new Mock<IOptions<IdentityOptions>>().Object,
+                new Mock<IPasswordHasher<AppUser>>().Object,
+                new[] { new Mock<IUserValidator<AppUser>>().Object },
+                new[] { new Mock<IPasswordValidator<AppUser>>().Object },
+                new Mock<ILookupNormalizer>().Object,
+                new Mock<IdentityErrorDescriber>().Object,
+                new Mock<IServiceProvider>().Object,
+                new Mock<ILogger<UserManager<AppUser>>>().Object);
 
             var contextAccessorMock = new Mock<IHttpContextAccessor>();
             var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<AppUser>>();
+            
             _signInManagerMock = new Mock<SignInManager<AppUser>>(
-                _userManagerMock.Object, contextAccessorMock.Object,
-                claimsFactoryMock.Object, null, null, null, null);
+                _userManagerMock.Object,
+                contextAccessorMock.Object,
+                claimsFactoryMock.Object,
+                new Mock<IOptions<IdentityOptions>>().Object,
+                new Mock<ILogger<SignInManager<AppUser>>>().Object,
+                new Mock<IAuthenticationSchemeProvider>().Object,
+                new Mock<IUserConfirmation<AppUser>>().Object);
 
             _jwtServiceMock = new Mock<IJwtService>();
             _loggerMock = new Mock<ILogger<AuthController>>();
@@ -65,7 +82,7 @@ namespace Guessnica_backend.Tests.Controllers
             };
 
             _userManagerMock.Setup(x => x.FindByEmailAsync("newuser@example.com"))
-                .ReturnsAsync((AppUser)null);
+                .ReturnsAsync((AppUser?)null);
             _userManagerMock.Setup(x => x.CreateAsync(It.IsAny<AppUser>(), dto.Password))
                 .ReturnsAsync(IdentityResult.Success);
             _userManagerMock.Setup(x => x.AddToRoleAsync(It.IsAny<AppUser>(), "User"))
@@ -77,6 +94,7 @@ namespace Guessnica_backend.Tests.Controllers
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             var response = okResult.Value;
+            Assert.NotNull(response);
 
             var messageProperty = response.GetType().GetProperty("message");
             Assert.NotNull(messageProperty);
@@ -118,6 +136,7 @@ namespace Guessnica_backend.Tests.Controllers
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             var response = okResult.Value;
+            Assert.NotNull(response);
 
             var messageProperty = response.GetType().GetProperty("message");
             Assert.NotNull(messageProperty);
@@ -143,7 +162,7 @@ namespace Guessnica_backend.Tests.Controllers
             };
 
             _userManagerMock.Setup(x => x.FindByEmailAsync("test@example.com"))
-                .ReturnsAsync((AppUser)null);
+                .ReturnsAsync((AppUser?)null);
             _userManagerMock.Setup(x => x.CreateAsync(It.IsAny<AppUser>(), dto.Password))
                 .ReturnsAsync(IdentityResult.Failed(new IdentityError { Description = "Hasło jest za krótkie" }));
 
@@ -151,6 +170,7 @@ namespace Guessnica_backend.Tests.Controllers
 
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
             var response = badRequestResult.Value;
+            Assert.NotNull(response);
 
             var messageProperty = response.GetType().GetProperty("message");
             Assert.NotNull(messageProperty);
@@ -172,7 +192,7 @@ namespace Guessnica_backend.Tests.Controllers
             };
 
             _userManagerMock.Setup(x => x.FindByEmailAsync("test@example.com"))
-                .ReturnsAsync((AppUser)null);
+                .ReturnsAsync((AppUser?)null);
             _userManagerMock.Setup(x => x.CreateAsync(It.IsAny<AppUser>(), dto.Password))
                 .ReturnsAsync(IdentityResult.Success);
             _userManagerMock.Setup(x => x.AddToRoleAsync(It.IsAny<AppUser>(), "User"))
@@ -199,7 +219,7 @@ namespace Guessnica_backend.Tests.Controllers
             };
 
             _userManagerMock.Setup(x => x.FindByEmailAsync("test@example.com"))
-                .ReturnsAsync((AppUser)null);
+                .ReturnsAsync((AppUser?)null);
             _userManagerMock.Setup(x => x.CreateAsync(It.IsAny<AppUser>(), dto.Password))
                 .ReturnsAsync(IdentityResult.Success);
             _userManagerMock.Setup(x => x.AddToRoleAsync(It.IsAny<AppUser>(), "User"))
@@ -218,23 +238,18 @@ namespace Guessnica_backend.Tests.Controllers
         public async Task Register_WithInvalidModel_ReturnsValidationProblem()
         {
             _controller.ModelState.AddModelError("Email", "The Email field is required.");
-            var dto = new RegisterDto { Email = null, Password = "Password123!", DisplayName = "Test User" };
-
+            var dto = new RegisterDto { Email = string.Empty, Password = "Password123!", DisplayName = "Test User" };
 
             var result = await _controller.Register(dto, _emailSenderMock.Object);
 
-
             var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
 
-
             Assert.NotNull(objectResult);
-
 
             Assert.Equal(400, objectResult.StatusCode);
 
             var problemDetails = Assert.IsType<Microsoft.AspNetCore.Mvc.ValidationProblemDetails>(objectResult.Value);
             Assert.NotEmpty(problemDetails.Errors);
-
 
             _userManagerMock.Verify(x => x.FindByEmailAsync(It.IsAny<string>()), Times.Never);
             _userManagerMock.Verify(x => x.CreateAsync(It.IsAny<AppUser>(), It.IsAny<string>()), Times.Never);
@@ -251,7 +266,7 @@ namespace Guessnica_backend.Tests.Controllers
             };
 
             _userManagerMock.Setup(x => x.FindByEmailAsync("failrole@example.com"))
-                .ReturnsAsync((AppUser)null);
+                .ReturnsAsync((AppUser?)null);
             _userManagerMock.Setup(x => x.CreateAsync(It.IsAny<AppUser>(), dto.Password))
                 .ReturnsAsync(IdentityResult.Success);
             _userManagerMock.Setup(x => x.AddToRoleAsync(It.IsAny<AppUser>(), "User"))
@@ -263,6 +278,7 @@ namespace Guessnica_backend.Tests.Controllers
             Assert.Equal(500, objectResult.StatusCode);
 
             var response = objectResult.Value;
+            Assert.NotNull(response);
             var messageProperty = response.GetType().GetProperty("message");
             Assert.NotNull(messageProperty);
             var message = messageProperty.GetValue(response)?.ToString();
@@ -281,7 +297,7 @@ namespace Guessnica_backend.Tests.Controllers
             };
 
             _userManagerMock.Setup(x => x.FindByEmailAsync("failmail@example.com"))
-                .ReturnsAsync((AppUser)null);
+                .ReturnsAsync((AppUser?)null);
             _userManagerMock.Setup(x => x.CreateAsync(It.IsAny<AppUser>(), dto.Password))
                 .ReturnsAsync(IdentityResult.Success);
             _userManagerMock.Setup(x => x.AddToRoleAsync(It.IsAny<AppUser>(), "User"))
@@ -302,6 +318,7 @@ namespace Guessnica_backend.Tests.Controllers
             Assert.Equal(500, objectResult.StatusCode);
 
             var response = objectResult.Value;
+            Assert.NotNull(response);
             var messageProperty = response.GetType().GetProperty("message");
             Assert.NotNull(messageProperty);
             var message = messageProperty.GetValue(response)?.ToString();
@@ -340,6 +357,7 @@ namespace Guessnica_backend.Tests.Controllers
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             var response = okResult.Value;
+            Assert.NotNull(response);
 
             var messageProperty = response.GetType().GetProperty("message");
             Assert.NotNull(messageProperty);
@@ -352,7 +370,7 @@ namespace Guessnica_backend.Tests.Controllers
         {
             var dto = new RegisterDto
             {
-                Email = null,
+                Email = string.Empty,
                 Password = "Password123!",
                 DisplayName = "Test User"
             };

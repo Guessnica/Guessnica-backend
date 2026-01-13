@@ -3,9 +3,11 @@ using Moq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Guessnica_backend.Models;
 using Guessnica_backend.Services;
 using Guessnica_backend.Dtos;
+using System.Collections.Generic;
 
 namespace Guessnica_backend.Tests.Controllers.AuthControllerTests;
 
@@ -18,54 +20,55 @@ public class FacebookLoginTests
     private readonly Mock<IFacebookAuthService> _facebookAuthServiceMock;
     private readonly AuthController _controller;
 
- public FacebookLoginTests()
-{
-    var userStoreMock = new Mock<IUserStore<AppUser>>();
-    var passwordHasherMock = new Mock<IPasswordHasher<AppUser>>();
-    var userValidatorsMock = new List<IUserValidator<AppUser>> { new Mock<IUserValidator<AppUser>>().Object };
-    var passwordValidatorsMock = new List<IPasswordValidator<AppUser>> { new Mock<IPasswordValidator<AppUser>>().Object };
-    var keyNormalizerMock = new Mock<ILookupNormalizer>();
-    var errorsMock = new Mock<IdentityErrorDescriber>();
-    var servicesMock = new Mock<IServiceProvider>();
-    var userLoggerMock = new Mock<ILogger<UserManager<AppUser>>>();
+    public FacebookLoginTests()
+    {
+        var userStoreMock = new Mock<IUserStore<AppUser>>();
+        var optionsAccessor = new Mock<IOptions<IdentityOptions>>();
+        var passwordHasherMock = new Mock<IPasswordHasher<AppUser>>();
+        var userValidatorsMock = new List<IUserValidator<AppUser>> { new Mock<IUserValidator<AppUser>>().Object };
+        var passwordValidatorsMock = new List<IPasswordValidator<AppUser>> { new Mock<IPasswordValidator<AppUser>>().Object };
+        var keyNormalizerMock = new Mock<ILookupNormalizer>();
+        var errorsMock = new Mock<IdentityErrorDescriber>();
+        var servicesMock = new Mock<IServiceProvider>();
+        var userLoggerMock = new Mock<ILogger<UserManager<AppUser>>>();
 
-    _userManagerMock = new Mock<UserManager<AppUser>>(
-        userStoreMock.Object, 
-        null, // options
-        passwordHasherMock.Object,
-        userValidatorsMock,
-        passwordValidatorsMock,
-        keyNormalizerMock.Object,
-        errorsMock.Object,
-        servicesMock.Object,
-        userLoggerMock.Object);
+        _userManagerMock = new Mock<UserManager<AppUser>>(
+            userStoreMock.Object,
+            optionsAccessor.Object,
+            passwordHasherMock.Object,
+            userValidatorsMock,
+            passwordValidatorsMock,
+            keyNormalizerMock.Object,
+            errorsMock.Object,
+            servicesMock.Object,
+            userLoggerMock.Object);
 
-    var contextAccessorMock = new Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
-    var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<AppUser>>();
-    var optionsAccessorMock = new Mock<Microsoft.Extensions.Options.IOptions<IdentityOptions>>();
-    var signInLoggerMock = new Mock<ILogger<SignInManager<AppUser>>>();
-    var schemesMock = new Mock<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>();
-    var confirmationMock = new Mock<IUserConfirmation<AppUser>>();
+        var contextAccessorMock = new Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+        var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<AppUser>>();
+        var optionsAccessorSignInMock = new Mock<Microsoft.Extensions.Options.IOptions<IdentityOptions>>();
+        var signInLoggerMock = new Mock<ILogger<SignInManager<AppUser>>>();
+        var schemesMock = new Mock<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>();
+        var confirmationMock = new Mock<IUserConfirmation<AppUser>>();
 
-    _signInManagerMock = new Mock<SignInManager<AppUser>>(
-        _userManagerMock.Object, 
-        contextAccessorMock.Object,
-        claimsFactoryMock.Object, 
-        optionsAccessorMock.Object,
-        signInLoggerMock.Object,
-        schemesMock.Object,
-        confirmationMock.Object);
+        _signInManagerMock = new Mock<SignInManager<AppUser>>(
+            _userManagerMock.Object,
+            contextAccessorMock.Object,
+            claimsFactoryMock.Object,
+            optionsAccessorSignInMock.Object,
+            signInLoggerMock.Object,
+            schemesMock.Object,
+            confirmationMock.Object);
 
-    _jwtServiceMock = new Mock<IJwtService>();
-    _loggerMock = new Mock<ILogger<AuthController>>();
-    _facebookAuthServiceMock = new Mock<IFacebookAuthService>();
+        _jwtServiceMock = new Mock<IJwtService>();
+        _loggerMock = new Mock<ILogger<AuthController>>();
+        _facebookAuthServiceMock = new Mock<IFacebookAuthService>();
 
-    _controller = new AuthController(
-        _userManagerMock.Object,
-        _signInManagerMock.Object,
-        _jwtServiceMock.Object,
-        _loggerMock.Object);
-}
+        _controller = new AuthController(
+            _userManagerMock.Object,
+            _signInManagerMock.Object,
+            _jwtServiceMock.Object,
+            _loggerMock.Object);
+    }
 
     [Fact]
     public async Task FacebookLogin_WithValidToken_ReturnsOkWithJwtToken()
@@ -158,8 +161,8 @@ public class FacebookLoginTests
             ExpiresAt = DateTime.UtcNow.AddHours(1)
         };
 
-        UserManager<AppUser> capturedUserManager = null;
-        IJwtService capturedJwtService = null;
+        UserManager<AppUser>? capturedUserManager = null;
+        IJwtService? capturedJwtService = null;
 
         _facebookAuthServiceMock
             .Setup(x => x.HandleFacebookLoginAsync(
@@ -191,7 +194,7 @@ public class FacebookLoginTests
                 It.IsAny<UserManager<AppUser>>(),
                 It.IsAny<IJwtService>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((TokenResponseDto)null);
+            .ReturnsAsync((TokenResponseDto?)null);
 
         var result = await _controller.FacebookLogin(dto, _facebookAuthServiceMock.Object);
 
@@ -199,7 +202,7 @@ public class FacebookLoginTests
         Assert.Equal(401, unauthorizedResult.StatusCode);
 
         var value = unauthorizedResult.Value;
-        var messageProperty = value.GetType().GetProperty("message");
+        var messageProperty = value?.GetType().GetProperty("message");
         Assert.NotNull(messageProperty);
         var message = messageProperty.GetValue(value)?.ToString();
         Assert.Equal("Facebook authentication failed.", message);
@@ -252,9 +255,9 @@ public class FacebookLoginTests
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Facebook authentication error")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Facebook authentication error")),
                 It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
 
@@ -262,7 +265,7 @@ public class FacebookLoginTests
     public async Task FacebookLogin_WithInvalidModel_ReturnsBadRequest()
     {
         _controller.ModelState.AddModelError("AccessToken", "Access token is required.");
-        var dto = new FacebookLoginDto { AccessToken = null };
+        var dto = new FacebookLoginDto { AccessToken = string.Empty };
 
         var result = await _controller.FacebookLogin(dto, _facebookAuthServiceMock.Object);
 

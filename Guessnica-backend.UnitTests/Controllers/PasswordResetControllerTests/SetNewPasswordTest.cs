@@ -3,6 +3,8 @@ using Moq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Guessnica_backend.Controllers;
 using Guessnica_backend.Models;
 using Guessnica_backend.Services;
@@ -12,6 +14,7 @@ using Guessnica_backend.Data;
 using System;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace Guessnica_backend.Tests.Controllers;
 
@@ -25,8 +28,25 @@ public class SetNewPasswordTests
     public SetNewPasswordTests()
     {
         var userStoreMock = new Mock<IUserStore<AppUser>>();
+        var optionsAccessor = new Mock<IOptions<IdentityOptions>>();
+        var passwordHasher = new Mock<IPasswordHasher<AppUser>>();
+        var userValidators = new List<IUserValidator<AppUser>>();
+        var passwordValidators = new List<IPasswordValidator<AppUser>>();
+        var keyNormalizer = new Mock<ILookupNormalizer>();
+        var errors = new Mock<IdentityErrorDescriber>();
+        var services = new Mock<IServiceProvider>();
+        var logger = new Mock<ILogger<UserManager<AppUser>>>();
+
         _userManagerMock = new Mock<UserManager<AppUser>>(
-            userStoreMock.Object, null, null, null, null, null, null, null, null);
+            userStoreMock.Object,
+            optionsAccessor.Object,
+            passwordHasher.Object,
+            userValidators,
+            passwordValidators,
+            keyNormalizer.Object,
+            errors.Object,
+            services.Object,
+            logger.Object);
 
         _emailSenderMock = new Mock<IAppEmailSender>();
 
@@ -89,7 +109,9 @@ public class SetNewPasswordTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         var value = okResult.Value;
         var messageProp = value.GetType().GetProperty("message");
+        Assert.NotNull(value);
         var message = messageProp.GetValue(value) as string;
+        Assert.NotNull(messageProp); 
         Assert.Equal("Password reset successfully.", message);
 
         _userManagerMock.Verify(x => x.ResetPasswordAsync(user, resetToken, dto.NewPassword), Times.Once);
@@ -106,7 +128,7 @@ public class SetNewPasswordTests
         );
 
         _userManagerMock.Setup(x => x.FindByEmailAsync("nonexistent@example.com"))
-            .ReturnsAsync((AppUser)null);
+            .ReturnsAsync((AppUser?)null);
 
         var result = await _controller.SetNewPassword(dto);
 
@@ -233,6 +255,7 @@ public class SetNewPasswordTests
 
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         var errorMessage = badRequestResult.Value as string;
+        Assert.NotNull(errorMessage);
         Assert.Contains("Password is too short", errorMessage);
     }
 
@@ -285,6 +308,7 @@ public class SetNewPasswordTests
         var afterReset = DateTime.UtcNow;
 
         var updatedRecord = await _context.UserVerificationCodes.FindAsync(codeId);
+        Assert.NotNull(updatedRecord);
         Assert.NotNull(updatedRecord.ResetSessionExpiresAtUtc);
         Assert.True(updatedRecord.ResetSessionExpiresAtUtc <= afterReset);
         Assert.True(updatedRecord.ResetSessionExpiresAtUtc >= beforeReset);

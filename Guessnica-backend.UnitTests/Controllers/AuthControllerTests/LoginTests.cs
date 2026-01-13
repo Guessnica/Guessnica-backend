@@ -7,6 +7,8 @@ using Guessnica_backend.Controllers;
 using Guessnica_backend.Models;
 using Guessnica_backend.Services;
 using Guessnica_backend.Dtos;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Authentication;
 
 namespace Guessnica_backend.Tests.Controllers;
 
@@ -21,14 +23,29 @@ public class LoginTests
     public LoginTests()
     {
         var userStoreMock = new Mock<IUserStore<AppUser>>();
+    
         _userManagerMock = new Mock<UserManager<AppUser>>(
-            userStoreMock.Object, null, null, null, null, null, null, null, null);
+            userStoreMock.Object,
+            new Mock<IOptions<IdentityOptions>>().Object,
+            new Mock<IPasswordHasher<AppUser>>().Object,
+            new[] { new Mock<IUserValidator<AppUser>>().Object },
+            new[] { new Mock<IPasswordValidator<AppUser>>().Object },
+            new Mock<ILookupNormalizer>().Object,
+            new Mock<IdentityErrorDescriber>().Object,
+            new Mock<IServiceProvider>().Object,
+            new Mock<ILogger<UserManager<AppUser>>>().Object);
 
         var contextAccessorMock = new Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
         var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<AppUser>>();
+    
         _signInManagerMock = new Mock<SignInManager<AppUser>>(
-            _userManagerMock.Object, contextAccessorMock.Object,
-            claimsFactoryMock.Object, null, null, null, null);
+            _userManagerMock.Object,
+            contextAccessorMock.Object,
+            claimsFactoryMock.Object,
+            new Mock<IOptions<IdentityOptions>>().Object,
+            new Mock<ILogger<SignInManager<AppUser>>>().Object,
+            new Mock<IAuthenticationSchemeProvider>().Object,
+            new Mock<IUserConfirmation<AppUser>>().Object);
 
         _jwtServiceMock = new Mock<IJwtService>();
         _loggerMock = new Mock<ILogger<AuthController>>();
@@ -76,7 +93,7 @@ public class LoginTests
     {
         var dto = new LoginDto { Email = "nonexistent@example.com", Password = "Password123!" };
         _userManagerMock.Setup(x => x.FindByEmailAsync(It.IsAny<string>()))
-            .ReturnsAsync((AppUser)null);
+            .ReturnsAsync((AppUser?)null);
 
         var result = await _controller.Login(dto);
 
@@ -184,7 +201,7 @@ public class LoginTests
     public async Task Login_WithInvalidModel_ReturnsValidationProblem()
     {
         _controller.ModelState.AddModelError("Email", "The Email field is required.");
-        var dto = new LoginDto { Email = null, Password = "Password123!" };
+        var dto = new LoginDto { Email = string.Empty, Password = "Password123!" };
 
         var result = await _controller.Login(dto);
 
@@ -219,6 +236,7 @@ public class LoginTests
         Assert.Equal(500, statusCodeResult.StatusCode);
 
         var errorMessage = statusCodeResult.Value?.ToString();
+        Assert.NotNull(errorMessage);
         Assert.DoesNotContain("JWT service internal error.", errorMessage);
         Assert.Contains("authentication", errorMessage, StringComparison.OrdinalIgnoreCase);
 
@@ -226,9 +244,9 @@ public class LoginTests
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("JWT generation failed")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("JWT generation failed")),
                 It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
 
@@ -277,7 +295,7 @@ public class LoginTests
     [Fact]
     public async Task Login_WithNullEmail_ReturnsUnauthorized()
     {
-        var dto = new LoginDto { Email = null, Password = "Password123!" };
+        var dto = new LoginDto { Email = string.Empty, Password = "Password123!" };
 
         var result = await _controller.Login(dto);
 

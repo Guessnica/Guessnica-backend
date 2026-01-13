@@ -3,6 +3,8 @@ using Moq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Guessnica_backend.Controllers;
 using Guessnica_backend.Models;
 using Guessnica_backend.Services;
@@ -21,8 +23,17 @@ public class RequestResetTests
     public RequestResetTests()
     {
         var userStoreMock = new Mock<IUserStore<AppUser>>();
+        
         _userManagerMock = new Mock<UserManager<AppUser>>(
-            userStoreMock.Object, null, null, null, null, null, null, null, null);
+            userStoreMock.Object,
+            new Mock<IOptions<IdentityOptions>>().Object,
+            new Mock<IPasswordHasher<AppUser>>().Object,
+            new[] { new Mock<IUserValidator<AppUser>>().Object },
+            new[] { new Mock<IPasswordValidator<AppUser>>().Object },
+            new Mock<ILookupNormalizer>().Object,
+            new Mock<IdentityErrorDescriber>().Object,
+            new Mock<IServiceProvider>().Object,
+            new Mock<ILogger<UserManager<AppUser>>>().Object);
 
         _emailSenderMock = new Mock<IAppEmailSender>();
         
