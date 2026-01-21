@@ -15,7 +15,7 @@ public class Location
     [Column(TypeName = "decimal(10,7)")]
     [Range(-180, 180)]
     public decimal Longitude { get; set; }
-    public string ImageUrl { get; set; }
+    public string ImageUrl { get; set; } = string.Empty;
     [MaxLength(200)]
     public string? ShortDescription { get; set; }
 }
