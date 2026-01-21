@@ -45,21 +45,21 @@ public class RiddlesController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Get(int id)
     {
-        var r = await _service.GetByIdAsync(id);
-        if (r == null) return NotFound();
+        var riddle = await _service.GetByIdAsync(id);
+        if (riddle == null) return NotFound();
 
         return Ok(new RiddleResponseDto
         {
-            Id = r.Id,
-            Description = r.Description,
-            Difficulty = (int)r.Difficulty,
-            LocationId = r.LocationId,
-            ShortDescription = r.Location.ShortDescription,
-            Latitude = r.Location.Latitude,
-            Longitude = r.Location.Longitude,
-            ImageUrl = r.Location.ImageUrl,
-            TimeLimitSeconds = r.TimeLimitSeconds,
-            MaxDistanceMeters = r.MaxDistanceMeters
+            Id = riddle.Id,
+            Description = riddle.Description,
+            Difficulty = (int)riddle.Difficulty,
+            LocationId = riddle.LocationId,
+            ShortDescription = riddle.Location.ShortDescription,
+            Latitude = riddle.Location.Latitude,
+            Longitude = riddle.Location.Longitude,
+            ImageUrl = riddle.Location.ImageUrl,
+            TimeLimitSeconds = riddle.TimeLimitSeconds,
+            MaxDistanceMeters = riddle.MaxDistanceMeters
         });
     }
     

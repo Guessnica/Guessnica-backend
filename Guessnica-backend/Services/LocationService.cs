@@ -23,7 +23,13 @@ public class LocationService : ILocationService
 
     public async Task<Location> GetByIdAsync(int id)
     {
-        return await _db.Locations.FindAsync(id);
+        var location = await _db.Locations
+            .FirstOrDefaultAsync(l => l.Id == id);
+        
+        if (location == null)
+            throw new KeyNotFoundException($"Location with id {id} not found");
+        
+        return location;
     }
 
     public async Task<Location> CreateAsync(Location loc, IFormFile image)
@@ -40,7 +46,8 @@ public class LocationService : ILocationService
     public async Task<Location> UpdateAsync(int id, Location updated, IFormFile? image = null)
     {
         var loc = await _db.Locations.FindAsync(id);
-        if (loc == null) return null;
+        if (loc == null)
+            throw new KeyNotFoundException($"Location with id {id} not found");
 
         loc.Latitude = updated.Latitude;
         loc.Longitude = updated.Longitude;

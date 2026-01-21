@@ -17,7 +17,6 @@ public class Riddle
     
     public int TimeLimitSeconds { get; set; }
     public int MaxDistanceMeters { get; set; }
-
-    public int LocationId { get; set; }
+    public required int LocationId { get; set; }
     public Location Location { get; set; } = null!;
 }
