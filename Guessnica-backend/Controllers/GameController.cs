@@ -13,10 +13,12 @@ using System.Security.Claims;
 public class GameController : ControllerBase
 {
     private readonly IGameService _game;
+    private readonly IConfiguration _config;
 
-    public GameController(IGameService game)
+    public GameController(IGameService game, IConfiguration config)
     {
         _game = game;
+        _config = config;
     }
 
     [HttpGet("daily")]
@@ -29,7 +31,9 @@ public class GameController : ControllerBase
         if (userId == null)
             return Unauthorized();
 
-        var ur = await _game.GetDailyRiddleAsync(userId);
+        var dailyHourUtc = _config.GetValue<int>("Game:DailyRiddleHourUtc", 0);
+
+        var ur = await _game.GetDailyRiddleAsync(userId, dailyHourUtc);
 
         return Ok(new DailyRiddleResponseDto
         {
