@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Authentication;
 using Guessnica_backend.Models;
 using Guessnica_backend.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Guessnica_backend.Tests.Controllers;
@@ -17,6 +18,7 @@ public class ConfirmEmailTests
     private readonly Mock<SignInManager<AppUser>> _signInManagerMock;
     private readonly Mock<IJwtService> _jwtServiceMock;
     private readonly Mock<ILogger<AuthController>> _loggerMock;
+    private readonly Mock<IConfiguration> _configuration;
     private readonly AuthController _controller;
 
     public ConfirmEmailTests()
@@ -25,7 +27,7 @@ public class ConfirmEmailTests
         var optionsMock = new Mock<IOptions<IdentityOptions>>();
         var passwordHasherMock = new Mock<IPasswordHasher<AppUser>>();
         var userValidators = new List<IUserValidator<AppUser>>();
-        var passwordValidators = new List<IPasswordValidator<AppUser>>();
+        var passwordValidators = new List<IUserValidator<AppUser>>();
         var keyNormalizerMock = new Mock<ILookupNormalizer>();
         var errorsMock = new Mock<IdentityErrorDescriber>();
         var servicesMock = new Mock<IServiceProvider>();
@@ -60,13 +62,14 @@ public class ConfirmEmailTests
 
         _jwtServiceMock = new Mock<IJwtService>();
         _loggerMock = new Mock<ILogger<AuthController>>();
-
+        _configuration = new Mock<IConfiguration>();
+        _configuration.Setup(c => c["Frontend:BaseUrl"]).Returns("http://localhost:5173");
         _controller = new AuthController(
             _userManagerMock.Object,
             _signInManagerMock.Object,
             _jwtServiceMock.Object,
-            _loggerMock.Object);
-        
+            _loggerMock.Object,
+            _configuration.Object);
     }
     private async Task TestBadRequest(string? userId, string? token, string expectedMessage)
     {
