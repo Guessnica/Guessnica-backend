@@ -11,4 +11,5 @@ public class DailyRiddleResponseDto
     public int Difficulty { get; set; }
     public int TimeLimitSeconds { get; set; }
     public double MaxDistanceMeters { get; set; }
+    public bool IsAnswered { get; set; }
 }

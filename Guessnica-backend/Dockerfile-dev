@@ -7,8 +7,6 @@ COPY . .
 RUN dotnet tool install --global dotnet-ef --version 8.0
 ENV PATH="$PATH:/root/.dotnet/tools"
 
-EXPOSE 8080
-EXPOSE 8081
 EXPOSE 8082
 
 CMD ["dotnet", "watch", "run", "--urls", "http://+:8082"]

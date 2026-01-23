@@ -5,14 +5,12 @@ services:
       context: .
       dockerfile: Guessnica-backend/Dockerfile
     ports:
-      - "8082:8081"
+      - "8082:8082"
     environment:
-      - ASPNETCORE_URLS=http://+:8081
+      - ASPNETCORE_URLS=http://+:8082
       - ASPNETCORE_ENVIRONMENT=Development
     volumes:
       - images:/app/wwwroot/images/locations
-    networks:
-      - guessnica
   db:
     image: postgres:16
     container_name: guessnica-db
@@ -24,8 +22,6 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks:
-      - guessnica
 
 networks:
   guessnica:

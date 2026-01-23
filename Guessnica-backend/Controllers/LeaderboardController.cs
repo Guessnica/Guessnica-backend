@@ -3,6 +3,7 @@ namespace Guessnica_backend.Controllers;
 using Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 [ApiController]
 [Route("leaderboard")]
@@ -21,5 +22,17 @@ public class LeaderboardController : ControllerBase
     {
         var result = await _service.GetLeaderboardAsync(days, count);
         return Ok(result);
+    }
+
+    [HttpGet("rank")]
+    [Authorize]
+    public async Task<IActionResult> GetUserRank([FromQuery] int days = 7)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var rank = await _service.GetUserRankAsync(userId, days);
+        return Ok(rank);
     }
 }

@@ -1,8 +1,7 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_URLS=http://+:8082
 EXPOSE 8082
-EXPOSE 8081
 RUN mkdir -p /app/wwwroot/images/locations \
     && chown -R 1000:1000 /app/wwwroot/images
 

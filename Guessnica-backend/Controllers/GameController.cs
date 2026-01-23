@@ -39,8 +39,10 @@ public class GameController : ControllerBase
             Description = ur.Riddle.Description,
             Difficulty = (int)ur.Riddle.Difficulty,
             TimeLimitSeconds = ur.Riddle.TimeLimitSeconds,
-            MaxDistanceMeters = ur.Riddle.MaxDistanceMeters
+            MaxDistanceMeters = ur.Riddle.MaxDistanceMeters,
+            IsAnswered = ur.AnsweredAt != null
         });
+
     }
     [HttpPost("answer")]
     [Authorize(Roles = "User,Admin")]
