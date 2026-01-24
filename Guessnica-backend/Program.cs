@@ -42,6 +42,17 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("https://rudderless-polished-julene.ngrok-free.dev")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 builder.Services
     .AddIdentityCore<AppUser>(options =>
     {
@@ -217,6 +228,8 @@ builder.Services.AddScoped<IGameService, GameService>();
 
 
 var app = builder.Build();
+
+app.UseCors("AllowFrontend");
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("E2E"))
 {
