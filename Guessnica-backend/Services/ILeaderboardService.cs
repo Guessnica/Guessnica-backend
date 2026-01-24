@@ -1,8 +1,9 @@
 namespace Guessnica_backend.Services;
 
-using Dtos;
+using Guessnica_backend.Dtos;
 
 public interface ILeaderboardService
 {
-    Task<List<LeaderboardEntryDto>> GetLeaderboardAsync(int days, int count);
+    Task<List<LeaderboardEntryDto>> GetLeaderboardAsync(int days, int count, LeaderboardCategory category);
+    Task<UserRankDto> GetUserRankAsync(string userId, int days, LeaderboardCategory category);
 }

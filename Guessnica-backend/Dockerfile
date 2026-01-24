@@ -1,8 +1,8 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
-ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8082
-EXPOSE 8081
+# Usuń stały port - Render ustawi zmienną PORT
+ENV ASPNETCORE_URLS=http://+:${PORT:-8080}
+EXPOSE 8080
 RUN mkdir -p /app/wwwroot/images/locations \
     && chown -R 1000:1000 /app/wwwroot/images
 

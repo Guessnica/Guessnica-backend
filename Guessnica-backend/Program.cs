@@ -10,6 +10,7 @@ using System.Text;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,10 +36,21 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
         var problem = new ValidationProblemDetails(errors)
         {
             Status = StatusCodes.Status400BadRequest,
-            Title  = "Validation failed"
+            Title = "Validation failed"
         };
         return new BadRequestObjectResult(problem);
     };
+});
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("https://rudderless-polished-julene.ngrok-free.dev")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
 });
 
 builder.Services
@@ -87,7 +99,7 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero,
         RoleClaimType = ClaimTypes.Role
     };
-    
+
     options.Events = new JwtBearerEvents
     {
         OnTokenValidated = async ctx =>
@@ -108,7 +120,7 @@ builder.Services.AddAuthentication(options =>
                 ctx.Fail("user_not_found");
                 return;
             }
-            
+
             var tokenStamp = ctx.Principal?.FindFirst("sstamp")?.Value;
             var currentStamp = await userManager.GetSecurityStampAsync(user);
             if (string.IsNullOrEmpty(tokenStamp) || tokenStamp != currentStamp)
@@ -116,7 +128,7 @@ builder.Services.AddAuthentication(options =>
                 ctx.Fail("token_revoked");
             }
         },
-        
+
         OnChallenge = ctx =>
         {
             if (!ctx.Response.HasStarted)
@@ -132,7 +144,7 @@ builder.Services.AddAuthentication(options =>
             }
             return Task.CompletedTask;
         },
-        
+
         OnAuthenticationFailed = ctx =>
         {
             Console.WriteLine($"JWT failed: {ctx.Exception.Message}");
@@ -176,7 +188,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
                      ?? new[] { "http://localhost:5173" };
 
 builder.Services.AddCors(options =>
@@ -185,14 +197,17 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .WithExposedHeaders("Content-Disposition")
+            .AllowCredentials();
     });
-    
+
     options.AddPolicy("ProdCors", policy =>
     {
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .WithExposedHeaders("Content-Disposition");
     });
 });
 
@@ -207,8 +222,57 @@ builder.Services.AddScoped<IAppEmailSender, MailKitEmailSender>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<ILocationService, LocationService>();
 builder.Services.AddScoped<IRiddleService, RiddleService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
+builder.Services.AddScoped<IGameService, GameService>();
+
 
 var app = builder.Build();
+
+app.UseCors("AllowFrontend");
+
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("E2E"))
+{
+    app.MapGet("/health", () => Results.Ok("OK"));
+}
+
+if (app.Environment.IsEnvironment("E2E"))
+{
+    app.MapPost("/e2e/seed", async (
+        AppDbContext db,
+        UserManager<AppUser> userManager,
+        RoleManager<IdentityRole> roleManager) =>
+    {
+        // Czyścimy użytkowników
+        db.Users.RemoveRange(db.Users);
+        await db.SaveChangesAsync();
+
+        foreach (var r in new[] { "User", "Admin" })
+        {
+            if (!await roleManager.RoleExistsAsync(r))
+                await roleManager.CreateAsync(new IdentityRole(r));
+        }
+
+        var user = new AppUser
+        {
+            UserName = "test@test.com",
+            Email = "test@test.com",
+            DisplayName = "E2E User",
+            EmailConfirmed = true
+        };
+
+        var result = await userManager.CreateAsync(user, "Password123!");
+        if (!result.Succeeded)
+            return Results.BadRequest(result.Errors);
+
+        await userManager.AddToRoleAsync(user, "User");
+
+        return Results.Ok();
+    });
+}
+
+var avatarsPath = Path.Combine(app.Environment.WebRootPath, "images", "avatars");
+Directory.CreateDirectory(avatarsPath);
 
 app.UseExceptionHandler("/error");
 
@@ -218,14 +282,33 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Guessnica API v1");
-        c.RoutePrefix = string.Empty;
+        c.RoutePrefix = "swagger";
         c.EnableTryItOutByDefault();
         c.DisplayRequestDuration();
         c.DefaultModelsExpandDepth(-1);
     });
 }
 
+app.MapGet("/", () => Results.Ok(new
+{
+    message = "Guessnica Backend API",
+    version = "v1"
+}));
+
 app.UseStaticFiles();
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(app.Environment.WebRootPath, "images")),
+    RequestPath = "/images",
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+        ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=3600");
+    }
+});
+
 app.UseCors(app.Environment.IsDevelopment() ? "DevCors" : "ProdCors");
 app.UseAuthentication();
 app.UseAuthorization();
@@ -246,89 +329,55 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var logger = services.GetRequiredService<ILogger<Program>>();
-    
+
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
-        
-        logger.LogInformation("Checking for pending migrations...");
-        
-        var pendingMigrations = context.Database.GetPendingMigrations();
-        if (pendingMigrations.Any())
-        {
-            logger.LogInformation("Applying {Count} pending migrations", pendingMigrations.Count());
-            context.Database.Migrate();
-            logger.LogInformation("Migrations applied successfully");
-        }
-        else
-        {
-            logger.LogInformation("Database is up to date");
-        }
+        context.Database.Migrate();
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occurred while migrating the database");
+        logger.LogError(ex, "Migration failed");
         throw;
     }
 }
 
-if (app.Environment.EnvironmentName != "Testing")
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await DbSeeder.SeedAsync(db);
+}
+
+if (app.Environment.EnvironmentName != "Testing"
+    && !app.Environment.IsEnvironment("E2E"))
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var userManager = services.GetRequiredService<UserManager<AppUser>>();
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
+    foreach (var r in new[] { "User", "Admin" })
     {
-        var services = scope.ServiceProvider;
-        var userManager = services.GetRequiredService<UserManager<AppUser>>();
-        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-        
-        foreach (var r in new[] { "User", "Admin" })
+        if (!await roleManager.RoleExistsAsync(r))
+            await roleManager.CreateAsync(new IdentityRole(r));
+    }
+
+    var userEmail = "test@example.com";
+    if (await userManager.FindByEmailAsync(userEmail) is null)
+    {
+        var user = new AppUser
         {
-            if (!await roleManager.RoleExistsAsync(r))
-            {
-                await roleManager.CreateAsync(new IdentityRole(r));
-            }
-        }
-        
-        var userEmail = "test@example.com";
-        var user = await userManager.FindByEmailAsync(userEmail);
-        if (user == null)
-        {
-            user = new AppUser
-            {
-                UserName = userEmail,
-                Email = userEmail,
-                DisplayName = "Test User",
-                EmailConfirmed = true
-            };
-            var createUser = await userManager.CreateAsync(user, "Haslo123!");
-            if (!createUser.Succeeded)
-                throw new Exception(string.Join("; ", createUser.Errors.Select(e => $"{e.Code}: {e.Description}")));
-        }
-        if (!await userManager.IsInRoleAsync(user, "User"))
-        {
-            await userManager.AddToRoleAsync(user, "User");
-        }
-        
-        var adminEmail = "admin@example.com";
-        var admin = await userManager.FindByEmailAsync(adminEmail);
-        if (admin == null)
-        {
-            admin = new AppUser
-            {
-                UserName = adminEmail,
-                Email = adminEmail,
-                DisplayName = "Admin User",
-                EmailConfirmed = true
-            };
-            var createAdmin = await userManager.CreateAsync(admin, "Admin123!");
-            if (!createAdmin.Succeeded)
-                throw new Exception(string.Join("; ", createAdmin.Errors.Select(e => $"{e.Code}: {e.Description}")));
-        }
-        if (!await userManager.IsInRoleAsync(admin, "Admin"))
-        {
-            await userManager.AddToRoleAsync(admin, "Admin");
-        }
+            UserName = userEmail,
+            Email = userEmail,
+            DisplayName = "Test User",
+            EmailConfirmed = true
+        };
+
+        await userManager.CreateAsync(user, "Haslo123!");
+        await userManager.AddToRoleAsync(user, "User");
     }
 }
+
 app.Run();
 
 public partial class Program { }
