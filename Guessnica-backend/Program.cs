@@ -13,6 +13,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8082";
+
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ListenAnyIP(int.Parse(port));
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -266,7 +272,12 @@ if (app.Environment.IsDevelopment())
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("E2E"))
 {
-    app.MapGet("/health", () => Results.Ok("OK"));
+    app.MapGet("/health", () => Results.Ok(new
+    {
+        status = "Healthy",
+        environment = app.Environment.EnvironmentName,
+        timestamp = DateTime.UtcNow
+    }));
 }
 
 if (app.Environment.IsEnvironment("E2E"))
