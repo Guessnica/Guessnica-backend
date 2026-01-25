@@ -42,17 +42,6 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("https://rudderless-polished-julene.ngrok-free.dev")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
-
 builder.Services
     .AddIdentityCore<AppUser>(options =>
     {
@@ -226,10 +215,55 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
 builder.Services.AddScoped<IGameService, GameService>();
 
-
 var app = builder.Build();
 
-app.UseCors("AllowFrontend");
+// Seedowanie bazy danych - tylko raz, tutaj
+if (app.Environment.EnvironmentName != "Testing" && !app.Environment.IsEnvironment("E2E"))
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+        try
+        {
+            var context = services.GetRequiredService<AppDbContext>();
+            var env = services.GetRequiredService<IWebHostEnvironment>();
+            var userManager = services.GetRequiredService<UserManager<AppUser>>();
+            
+            // Zastosuj migracje
+            await context.Database.MigrateAsync();
+            
+            // Wykonaj SeedData (role i podstawowi użytkownicy: test@example.com, admin@example.com)
+            await SeedData.EnsureSeedDataAsync(services);
+            
+            // Wykonaj DbSeeder (20 lokalizacji, 20 zagadek, 20 użytkowników testowych)
+            await DbSeeder.SeedAsync(context, env, userManager);
+        }
+        catch (Exception ex)
+        {
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogError(ex, "An error occurred while seeding the database.");
+        }
+    }
+}
+
+// Tworzenie folderu na awatary
+var avatarsPath = Path.Combine(app.Environment.WebRootPath, "images", "avatars");
+Directory.CreateDirectory(avatarsPath);
+
+app.UseExceptionHandler("/error");
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Guessnica API v1");
+        c.RoutePrefix = "swagger";
+        c.EnableTryItOutByDefault();
+        c.DisplayRequestDuration();
+        c.DefaultModelsExpandDepth(-1);
+    });
+}
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("E2E"))
 {
@@ -243,7 +277,6 @@ if (app.Environment.IsEnvironment("E2E"))
         UserManager<AppUser> userManager,
         RoleManager<IdentityRole> roleManager) =>
     {
-        // Czyścimy użytkowników
         db.Users.RemoveRange(db.Users);
         await db.SaveChangesAsync();
 
@@ -268,24 +301,6 @@ if (app.Environment.IsEnvironment("E2E"))
         await userManager.AddToRoleAsync(user, "User");
 
         return Results.Ok();
-    });
-}
-
-var avatarsPath = Path.Combine(app.Environment.WebRootPath, "images", "avatars");
-Directory.CreateDirectory(avatarsPath);
-
-app.UseExceptionHandler("/error");
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Guessnica API v1");
-        c.RoutePrefix = "swagger";
-        c.EnableTryItOutByDefault();
-        c.DisplayRequestDuration();
-        c.DefaultModelsExpandDepth(-1);
     });
 }
 
@@ -324,59 +339,6 @@ app.Map("/error", (HttpContext httpContext) =>
         statusCode: StatusCodes.Status500InternalServerError
     );
 });
-
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    var logger = services.GetRequiredService<ILogger<Program>>();
-
-    try
-    {
-        var context = services.GetRequiredService<AppDbContext>();
-        context.Database.Migrate();
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Migration failed");
-        throw;
-    }
-}
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await DbSeeder.SeedAsync(db);
-}
-
-if (app.Environment.EnvironmentName != "Testing"
-    && !app.Environment.IsEnvironment("E2E"))
-{
-    using var scope = app.Services.CreateScope();
-    var services = scope.ServiceProvider;
-    var userManager = services.GetRequiredService<UserManager<AppUser>>();
-    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-
-    foreach (var r in new[] { "User", "Admin" })
-    {
-        if (!await roleManager.RoleExistsAsync(r))
-            await roleManager.CreateAsync(new IdentityRole(r));
-    }
-
-    var userEmail = "test@example.com";
-    if (await userManager.FindByEmailAsync(userEmail) is null)
-    {
-        var user = new AppUser
-        {
-            UserName = userEmail,
-            Email = userEmail,
-            DisplayName = "Test User",
-            EmailConfirmed = true
-        };
-
-        await userManager.CreateAsync(user, "Haslo123!");
-        await userManager.AddToRoleAsync(user, "User");
-    }
-}
 
 app.Run();
 
