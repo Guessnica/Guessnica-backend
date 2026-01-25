@@ -178,7 +178,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
-                     ?? new[] { "http://localhost:5173" };
+                     ?? new[] { "http://localhost:5173", "https://guessnica.vercel.app" };
 
 builder.Services.AddCors(options =>
 {
@@ -187,7 +187,6 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .WithExposedHeaders("Content-Disposition")
             .AllowCredentials();
     });
 
